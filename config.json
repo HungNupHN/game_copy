@@ -1,0 +1,10 @@
+{
+  "steam_source": "",
+  "steam_dest": "C:/Program Files (x86)/Steam",
+  "riot_source": "",
+  "riot_dest": "C:/Riot Games",
+  "app_source": "",
+  "license_key": "test_key",
+  "app_version": "1.0",
+  "theme": "dark"
+}
