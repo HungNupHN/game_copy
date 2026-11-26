@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, Callable
 import requests
 
-CURRENT_VERSION = "1.0"
-AUTH_URL = "https://raw.githubusercontent.com/HungNupHN/Gamecopy/refs/heads/main/auth.json"
+CURRENT_VERSION = "1.1"
+AUTH_URL = "https://raw.githubusercontent.com/HungNupHN/game_copy/refs/heads/main/auth.json"
 
 
 def parse_version(ver_str: str) -> Tuple[int, ...]:

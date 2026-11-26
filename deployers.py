@@ -433,6 +433,215 @@ should_repair: false
 
 
 # ==============================================================================
+# Module 2B: Delta Force Deployer (Garena)
+# ==============================================================================
+
+class DeltaForceDeployer:
+    """Handles scanning and deploying Delta Force game files."""
+
+    @staticmethod
+    def scan(source_dir: Path, cancel_event: Optional[threading.Event] = None) -> List[Dict[str, Any]]:
+        """
+        Scan source directory for Delta Force game files/folders.
+        If source_dir has a subfolder with 'delta' in its name, uses that;
+        otherwise treats source_dir itself as the Delta Force folder if non-empty.
+        """
+        source_dir = Path(source_dir)
+        if not source_dir.exists() or not source_dir.is_dir():
+            return []
+
+        games: List[Dict[str, Any]] = []
+        try:
+            entries = list(source_dir.iterdir())
+        except Exception:
+            return []
+
+        if not entries:
+            return []
+
+        # Check if there is a dedicated Delta Force subfolder inside source_dir
+        delta_subfolders = [
+            item for item in entries
+            if item.is_dir() and "delta" in item.name.lower()
+        ]
+
+        if delta_subfolders:
+            for folder in delta_subfolders:
+                if cancel_event and cancel_event.is_set():
+                    break
+                size = get_dir_size(folder, cancel_event=cancel_event)
+                games.append({
+                    "id": folder.name.lower().replace(" ", "_"),
+                    "name": folder.name,
+                    "path": folder,
+                    "size_bytes": size,
+                    "size_gb": round(size / (1024 ** 3), 2),
+                    "copy_into_dest_directly": False,
+                })
+        else:
+            # Treat source_dir itself as the Delta Force game root
+            size = get_dir_size(source_dir, cancel_event=cancel_event)
+            if size > 0 or len(entries) > 0:
+                games.append({
+                    "id": "delta_force",
+                    "name": "Delta Force",
+                    "path": source_dir,
+                    "size_bytes": size,
+                    "size_gb": round(size / (1024 ** 3), 2),
+                    "copy_into_dest_directly": True,
+                })
+
+        return games
+
+    @staticmethod
+    def deploy_single_game(
+        game: Dict[str, Any],
+        dest_dir: Path,
+        progress_callback: Optional[Callable[[int, int, str, float], None]] = None,
+        log_callback: Optional[Callable[[str], None]] = None,
+        cancel_event: Optional[threading.Event] = None,
+        initial_copied: int = 0,
+        overall_total: int = 0,
+    ) -> Tuple[bool, int]:
+        """Deploy Delta Force game folder to destination."""
+        dest_dir = Path(dest_dir)
+        src_folder: Path = game["path"]
+
+        if game.get("copy_into_dest_directly", True):
+            target_folder = dest_dir
+        else:
+            target_folder = dest_dir / src_folder.name
+
+        if log_callback:
+            log_callback(f"[Delta Force] Copying {game['name']} ({format_bytes(game['size_bytes'])}) to {target_folder}...")
+
+        ok, copied_bytes = copy_tree_with_progress(
+            src_dir=src_folder,
+            dst_dir=target_folder,
+            progress_callback=progress_callback,
+            cancel_event=cancel_event,
+            log_callback=log_callback,
+            initial_copied=initial_copied,
+            overall_total=overall_total,
+        )
+
+        if ok and log_callback:
+            log_callback(f"[Delta Force] Successfully deployed {game['name']}!")
+
+        return ok, copied_bytes
+
+
+# ==============================================================================
+# Client Installation Checker
+# ==============================================================================
+
+def _reg_read_value(root_key: Any, subkey: str, value_name: str) -> Optional[str]:
+    """Safely read a string value from Windows Registry."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import winreg
+        with winreg.OpenKey(root_key, subkey, 0, winreg.KEY_READ) as key:
+            val, _ = winreg.QueryValueEx(key, value_name)
+            return str(val) if val else None
+    except Exception:
+        return None
+
+
+def check_installed_clients(
+    steam_dest: Optional[str] = None,
+    riot_dest: Optional[str] = None,
+    delta_dest: Optional[str] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Check whether Steam, Riot Client, and Delta Force / Garena Client are installed.
+    Checks Windows Registry and standard installation directories.
+    """
+    results: Dict[str, Dict[str, Any]] = {
+        "steam": {"installed": False, "path": ""},
+        "riot": {"installed": False, "path": ""},
+        "delta_garena": {"installed": False, "path": ""},
+    }
+
+    if sys.platform == "win32":
+        import winreg
+
+        # 1. Check Steam
+        steam_candidates = [
+            Path(steam_dest) / "steam.exe" if steam_dest else None,
+            Path("C:/Program Files (x86)/Steam/steam.exe"),
+            Path("C:/Program Files/Steam/steam.exe"),
+        ]
+        reg_steam = (
+            _reg_read_value(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamExe")
+            or _reg_read_value(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath")
+            or _reg_read_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath")
+            or _reg_read_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Valve\Steam", "InstallPath")
+        )
+        if reg_steam:
+            p = Path(reg_steam)
+            if p.is_dir():
+                steam_candidates.insert(0, p / "steam.exe")
+            else:
+                steam_candidates.insert(0, p)
+
+        for cand in steam_candidates:
+            if cand and cand.exists():
+                results["steam"] = {"installed": True, "path": str(cand.parent)}
+                break
+
+        # 2. Check Riot Client
+        riot_candidates = [
+            Path(riot_dest) / "Riot Client" / "RiotClientServices.exe" if riot_dest else None,
+            Path("C:/Riot Games/Riot Client/RiotClientServices.exe"),
+            Path("D:/Riot Games/Riot Client/RiotClientServices.exe"),
+            Path("C:/ProgramData/Riot Games/RiotClientInstalls.json"),
+        ]
+        reg_riot = (
+            _reg_read_value(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game valorant.live", "InstallLocation")
+            or _reg_read_value(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game league_of_legends.live", "InstallLocation")
+        )
+        if reg_riot:
+            riot_candidates.append(Path(reg_riot))
+
+        for cand in riot_candidates:
+            if cand and cand.exists():
+                results["riot"] = {"installed": True, "path": str(cand)}
+                break
+
+        # 3. Check Delta Force Garena Client
+        garena_candidates = [
+            Path("C:/Program Files (x86)/Garena/Garena/Garena.exe"),
+            Path("C:/Program Files/Garena/Garena/Garena.exe"),
+            Path("C:/Garena/Garena.exe"),
+            Path("C:/Program Files (x86)/Garena/Garena.exe"),
+            Path("C:/ProgramData/Garena"),
+            Path(delta_dest) / "delta_force_launcher.exe" if delta_dest else None,
+            Path(delta_dest) / "Launcher" / "DeltaForceLauncher.exe" if delta_dest else None,
+            Path(delta_dest) if delta_dest else None,
+        ]
+        reg_garena = (
+            _reg_read_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Garena\Garena", "InstallPath")
+            or _reg_read_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Garena\Garena", "InstallPath")
+            or _reg_read_value(winreg.HKEY_CURRENT_USER, r"Software\Garena\Garena", "InstallPath")
+            or _reg_read_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Garena", "InstallLocation")
+            or _reg_read_value(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\DeltaForce", "InstallLocation")
+        )
+        if reg_garena:
+            garena_candidates.insert(0, Path(reg_garena))
+
+        for cand in garena_candidates:
+            if cand and cand.exists():
+                # Avoid false positive if delta_dest is an empty folder
+                if cand.is_dir() and not any(cand.iterdir()):
+                    continue
+                results["delta_garena"] = {"installed": True, "path": str(cand)}
+                break
+
+    return results
+
+
+# ==============================================================================
 # Module 3: Silent App Installer
 # ==============================================================================
 

@@ -20,6 +20,17 @@ def build_executable() -> None:
 
     ctk_path = Path(customtkinter.__file__).resolve().parent
 
+    target_name = "GameDeployer"
+    idx = 2
+    while (project_dir / "dist" / f"{target_name}.exe").exists():
+        try:
+            with open(project_dir / "dist" / f"{target_name}.exe", "r+b"):
+                break
+        except PermissionError:
+            print(f"[Build] Note: {target_name}.exe is currently running/locked.")
+            target_name = f"GameDeployer_v{idx}"
+            idx += 1
+
     cmd = [
         sys.executable,
         "-m",
@@ -29,7 +40,7 @@ def build_executable() -> None:
         "--onefile",
         "--noconsole",
         "--uac-admin",
-        "--name=GameDeployer",
+        f"--name={target_name}",
         f"--add-data={ctk_path};customtkinter",
         "--collect-all=customtkinter",
         str(main_script),
@@ -42,7 +53,7 @@ def build_executable() -> None:
     result = subprocess.run(cmd, cwd=str(project_dir))
 
     if result.returncode == 0:
-        exe_output = project_dir / "dist" / "GameDeployer.exe"
+        exe_output = project_dir / "dist" / f"{target_name}.exe"
         print("\n" + "=" * 70)
         print(f"BUILD SUCCESSFUL!")
         print(f"Standalone executable generated at:\n{exe_output}")

@@ -13,7 +13,7 @@ A production-ready, thread-safe Windows Desktop GUI application built with Pytho
 - Default Riot Destination: `C:/Riot Games`.
 
 ### 2. Online Authentication & Seamless Self-Update
-- **Bypass Cache**: Fetches remote `auth.json` from `https://raw.githubusercontent.com/HungNupHN/Gamecopy/refs/heads/main/auth.json` with cache-busting headers (`Cache-Control: no-cache`) and timestamp query parameter.
+- **Bypass Cache**: Fetches remote `auth.json` from `https://raw.githubusercontent.com/HungNupHN/game_copy/refs/heads/main/auth.json` with cache-busting headers (`Cache-Control: no-cache`) and timestamp query parameter.
 - **Kill Switch**: If `global_status != "active"`, displays server message dialog and immediately exits.
 - **Seamless Self-Update**:
   - Compares `CURRENT_VERSION = "1.0"` with remote `latest_version`.

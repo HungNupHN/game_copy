@@ -17,13 +17,15 @@ class ConfigManager:
     def __init__(self, config_path: Optional[Path] = None):
         self._lock = threading.Lock()
         self._defaults: Dict[str, Any] = {
-            "steam_source": "",
+            "steam_source": "D:/test/Steam",
             "steam_dest": "C:/Program Files (x86)/Steam",
-            "riot_source": "",
+            "riot_source": "D:/test/Riot Games",
             "riot_dest": "C:/Riot Games",
+            "delta_source": "D:/test/Delta Force",
+            "delta_dest": "C:/Delta Force",
             "app_source": "",
             "license_key": "",
-            "app_version": "1.0",
+            "app_version": "1.1",
             "theme": "dark",
         }
         self._data: Dict[str, Any] = {}
@@ -116,7 +118,7 @@ class ConfigManager:
     # Convenience properties
     @property
     def steam_source(self) -> str:
-        return self.get("steam_source", "")
+        return self.get("steam_source", "D:/test/Steam")
 
     @steam_source.setter
     def steam_source(self, val: str) -> None:
@@ -132,7 +134,7 @@ class ConfigManager:
 
     @property
     def riot_source(self) -> str:
-        return self.get("riot_source", "")
+        return self.get("riot_source", "D:/test/Riot Games")
 
     @riot_source.setter
     def riot_source(self, val: str) -> None:
@@ -145,6 +147,22 @@ class ConfigManager:
     @riot_dest.setter
     def riot_dest(self, val: str) -> None:
         self.set("riot_dest", val)
+
+    @property
+    def delta_source(self) -> str:
+        return self.get("delta_source", "D:/test/Delta Force")
+
+    @delta_source.setter
+    def delta_source(self, val: str) -> None:
+        self.set("delta_source", val)
+
+    @property
+    def delta_dest(self) -> str:
+        return self.get("delta_dest", "C:/Delta Force")
+
+    @delta_dest.setter
+    def delta_dest(self, val: str) -> None:
+        self.set("delta_dest", val)
 
     @property
     def app_source(self) -> str:
