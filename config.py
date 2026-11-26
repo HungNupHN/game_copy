@@ -25,7 +25,7 @@ class ConfigManager:
             "delta_dest": "C:/Delta Force",
             "app_source": "",
             "license_key": "",
-            "app_version": "1.1",
+            "app_version": "1.1.1",
             "theme": "dark",
         }
         self._data: Dict[str, Any] = {}
